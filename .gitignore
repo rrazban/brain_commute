@@ -1,6 +1,5 @@
 *.pyc
 *extra*
 data/
-simulation/
 __pycache__/
 .DS_Store
