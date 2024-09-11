@@ -15,13 +15,13 @@ from scipy.stats import gaussian_kde
 
 
 sys.path.append('utlts/')
-from analysis_tools import get_structure, delete_indi, no_edges, correlation, delete_empty_index, visualize_matrix
+from analysis_tools import get_structure, delete_indi, no_edges, delete_empty_index, visualize_matrix
 from structure_metrics import commute_time, deconstruct_cov
 
 
 plt.rcParams.update({'font.size': 14})
 
-def plotter(sub_id, xs, corrmat, xlabel, ylabel = 'functional connectivity (fMRI)'):
+def plotter(title, xs, corrmat, xlabel, ylabel = 'functional connectivity (fMRI)'):
 	upper_tri = np.triu_indices(corrmat.shape[0], k=1)  #get rid of double counting for symmetric matrices
 	xs = xs[upper_tri]
 	ys = corrmat[upper_tri]
@@ -32,16 +32,20 @@ def plotter(sub_id, xs, corrmat, xlabel, ylabel = 'functional connectivity (fMRI
 	xy = np.vstack([xs,ys])
 	z = gaussian_kde(xy)(xy)
 
-	plt.scatter(xs, ys, c=z, label="$\\rho=${0:.2f} ({1:.2E})\n$n=${2} edges".format(r, pvalue, len(xs)))
-	plt.title('{0} subject {1}, {2} atlas'.format(dataset, sub_id, atlas))
-#	plt.title('UK Biobank subject {0}'.format(sub_id))
+#	plt.scatter(xs, ys, c=z, label="$\\rho=${0:.2f} ({1:.2E})\n$n=${2} edges".format(r, pvalue, len(xs)))
+	if pvalue==0:
+		plt.scatter(xs, ys, c=z, label="$\\rho=${0:.2f} (<1E-300)\n$n=${2} edges".format(r, pvalue, len(xs)))
+	else:
+		plt.scatter(xs, ys, c=z, label="$\\rho=${0:.2f} ({1:.2E})\n$n=${2} edges".format(r, pvalue, len(xs)))
 
-
+	plt.title(title)
 	plt.legend()
 	plt.ylabel(ylabel)
 	plt.xlabel(xlabel)
 	plt.tight_layout()
 	plt.show()
+
+
 
 
 if __name__ == "__main__":
@@ -67,7 +71,9 @@ if __name__ == "__main__":
 	structure = delete_indi(indi, structure)
 	fc = delete_indi(indi, fc)
 
-	plotter(sub_id, commute_time(structure), fc, 'commute time (dMRI)')
+	title = 'UK Biobank subject {0}'.format(sub_id)
+#	title='{0} subject {1}, {2} atlas'.format(dataset, sub_id, atlas)
+	plotter(title, commute_time(structure), fc, 'commute time (dMRI)')
 
 	modes =1 
-	plotter(sub_id, commute_time(structure),deconstruct_cov(fc, modes), 'commute time (dMRI)', 'top {0} mode(s) of FC (fMRI)'.format(modes))
+	plotter(title, commute_time(structure),deconstruct_cov(fc, modes), 'commute time (dMRI)', 'top {0} mode(s) of FC (fMRI)'.format(modes))

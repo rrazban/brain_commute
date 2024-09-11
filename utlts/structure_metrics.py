@@ -26,6 +26,7 @@ def commute_time(structure):
 	for i in range(size):
 		for j in range(size):
 			dists[i,j] = (inv_lap[i,i] + inv_lap[j,j] - 2*inv_lap[i,j])*total_edges		#technically, this is the defn of commute time
+#			dists[i,j] = (inv_lap[i,i] + inv_lap[j,j] - 2*inv_lap[i,j])
 #			dists[i,j] =  inv_lap[i,j]	#hack to calculate ENM cross correlation
 	return dists
 

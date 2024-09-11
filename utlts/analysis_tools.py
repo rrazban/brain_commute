@@ -46,26 +46,18 @@ def correlation(xs, ys, upper_tri):
 
 def get_structure(fmri_file, dataset, atlas, which):	#maybe just have which and atlas
 	sub = os.path.basename(fmri_file)
-	sub = sub[:sub.index('_')]
+	sub = sub[:sub.index('_')]	#need this for multiple fMRI runs
+#	sub = sub[:sub.index('.csv')]
 
 	if dataset=='ukb':
 		dmri_file = 'data/ukb/{0}/dMRI/{1}_20250_2_0_{2}.txt'.format(atlas, sub, which)
 	else:
-		dmri_file = 'data/{0}/{1}/dMRI/{2}_{3}.txt'.format(dataset, atlas, sub, which)
+#		dmri_file = 'data/{0}/{1}/dMRI/{2}_{3}.txt'.format(dataset, atlas, sub, which)
+		dmri_file = 'data/{0}/{1}/dMRI/probabilistic/density1/{2}_{3}.txt'.format(dataset, atlas, sub, which)
 
 	structure = np.loadtxt(dmri_file)
 	np.fill_diagonal(structure,0)	#very important, otherwise self-loops are included in calculation of adjacency matrix
 	return sub, structure
-
-def get_structure_length(fmri_file, which):	#have this collapsed with previous fxn with just an additional parameter in function that says whether 'density' or 'length'
-	sub = os.path.basename(fmri_file)
-	sub = sub[:sub.index('_')]
-#	dmri_file = 'data/{0}/dMRI/length/{1}_20250_2_0_length.txt'.format(which, sub)	#already averaged across all tracts
-	dmri_file = 'data/hcp_ya_100/{0}/dMRI/{1}_length.txt'.format(which, sub)
-
-	structure = np.loadtxt(dmri_file)
-	np.fill_diagonal(structure,0)	#very important, otherwise self-loops are included in calculation of adjacency matrix	
-	return structure
 
 
 def delete_indi(indi, mat):

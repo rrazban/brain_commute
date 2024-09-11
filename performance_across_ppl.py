@@ -2,7 +2,7 @@
 Compare commute time to other structure-based 
 metrics trying to predict functional connectivty.
 Across all individuals from UK Biobank or 
-HCP Young Adult dataset
+HCP Young Adult dataset.
 
 """
 
@@ -57,6 +57,7 @@ def run(fmri_files, which):
 		outputs.append([correlation(cmys, fc_top_mode, upper_tri), 'top', 'communicability'])
 
 		cts = commute_time(structure)
+
 		outputs.append([-correlation(cts, fc, upper_tri), 'all', 'commute time'])
 		outputs.append([-correlation(cts, fc_top_mode, upper_tri), 'top', 'commute time'])
 
@@ -64,6 +65,22 @@ def run(fmri_files, which):
 		subs.append(int(sub))
 
 	return outputs
+
+def plotout(df, title):
+	plt.figure().set_figwidth(8.5)
+	ax= sns.violinplot(data=df, x='metric', y='corr', hue='FC modes', inner='quart', split=True)
+	sns.move_legend(ax, loc='upper left')
+
+
+	plt.xticks(np.arange(4), ['adjacency', '$-$search info','$-$communicability', 'commute time'])
+	plt.ylim([-0.1, 0.7])
+
+	plt.xlabel('metrics calculated based on structure')
+	plt.ylabel('$\\rho($structure, FC$)$')
+	plt.title(title)
+	plt.grid()
+	plt.tight_layout()
+	plt.show()
 
 
 def compare_distributions(df):
@@ -80,7 +97,6 @@ def compare_distributions(df):
 
 			kval, pval = kstest(ct, metric)
 			print(metric1, metric_name, kval, pval)
-		#kval, pval = kstest(df_data['corr'], df_cmy['corr'])	#maybe have this in a si table?
 
 
 if __name__ == "__main__":
@@ -92,31 +108,21 @@ if __name__ == "__main__":
 	outputs = run(fmri_files, atlas)
 	df = pd.DataFrame(outputs, columns = ['corr', 'FC modes', 'metric'])
 
-	plt.figure().set_figwidth(8.5)
-	ax= sns.violinplot(data=df, x='metric', y='corr', hue='FC modes', inner='quart', split=True)
-	sns.move_legend(ax, loc='upper left')
 
+	if dataset=='ukb':
+		title = 'UK Biobank ($N=${0} subjects)'.format(len(fmri_files))
+	elif dataset=='hcp_ya_100':
+		if atlas=='Glasser':
+			title = 'HCP Young Adult, probabilistic tractography, Glasser atlas ($N=${0} subjects)'.format(len(ct))	#data from Rosen et al. 2021	
+		else:
+			title='HCP Young Adult ($N=${0} scans)'.format(len(fmri_files))
+	plotout(df, title)
 
-	plt.xticks(np.arange(4), ['adjacency', '$-$search info','$-$communicability', 'commute time'])
-	plt.xlabel('metrics calculated based on structure')
-	plt.ylabel('$\\rho($structure, FC$)$')
-	plt.ylim([-0.1, 0.7])
-	plt.grid()
-	plt.tight_layout()
-
-
-	pre_ct = df[df['metric']=='adjacency']
-	ct = pre_ct[pre_ct['FC modes']=='all']['corr']
-	plt.title('{0} ($N=${1} subjects), {2} atlas'.format(dataset, len(ct), atlas))	
-#	plt.title('HCP Young Adult ($N=${0} scans)'.format(len(ct)))	
-#	plt.title('UK Biobank ($N=${0} subjects)'.format(len(ct)))	
-
-
+#print mean and std of correlations across individuals
 #	pre_group = df[df['metric']=='commute time']
-#	group = pre_group[pre_group['FC modes']=='all']
 #	print_stats(pre_group[pre_group['FC modes']=='all'])
 #	print_stats(pre_group[pre_group['FC modes']=='top'])
-	plt.show()
 
+#print Kologomorov-Smirnov test summary for pairwise distribution comparision
 #	compare_distributions(df)
 
