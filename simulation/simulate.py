@@ -140,9 +140,17 @@ def writeout_spin_states(out_dir, lam, sim_id, output):
 		writer = csv.writer(f)
 		writer.writerows(output) 
 
+
 def hrf(t):
-    "A hemodynamic response function"
-    return t ** 8.6 * np.exp(-t / 0.547)
+#https://github.com/the-virtual-brain/tvb-library/blob/db1d399951c9a71fcb70b7453a9659724862c4c5/tvb/datatypes/equations.py#L538
+	#from the VirtualBrain, not sure why k_1, and V_0 defined when does not appear...
+	tau_s= 0.8
+	tau_f= 0.4
+	k_1=5.6
+	V_0=0.02
+
+	return (1/3. * np.exp(-0.5*(t / tau_s)) * (np.sin(np.sqrt(1./tau_f - 1./(4.*tau_s**2)) * t)) / (np.sqrt(1./tau_f - 1./(4.*tau_s**2))))
+
 
 def writeout_bold(out_file, outputs, times, size):
         outputs = np.array(outputs)
@@ -170,10 +178,11 @@ def writeout_bold(out_file, outputs, times, size):
 
 
 def main(args,ver):
-    sub_id = '1737411'	#'1000366'
+    #sub_id = '1000366'
+    sub_id = '1737411'
     atlas = 'DesKi'
 
-    dmri_file = '../data/{0}/dMRI/{1}_20250_2_0_density.txt'.format(atlas, sub_id)       
+    dmri_file = '../data/ukb/{0}/dMRI/{1}_20250_2_0_density.txt'.format(atlas, sub_id)       
     structure = np.loadtxt(dmri_file)
     np.fill_diagonal(structure,0)   #very important, otherwise self-loops are included in calculation of adjacency matrix
 
@@ -181,6 +190,8 @@ def main(args,ver):
 
     indi = no_edges(structure)
     adjacency = delete_indi(indi, structure)
+
+#    adjacency[adjacency>0] = 1	#make it binary
 
     size = adjacency.shape[0]
 	
@@ -192,6 +203,7 @@ def main(args,ver):
 
     ising_system = IsingSystem(size, args.num_sweeps,
                                args.lambdaa, np.copy(adjacency))
+
     ising_system.run_simulation(args.verbose)
 
     sim_id = 0
@@ -201,7 +213,7 @@ def main(args,ver):
 
     out_file = '{0}/bold_lam{1}_sim{2}.csv'.format(out_dir, args.lambdaa, sim_id)
     if os.path.exists(out_file):
-        for i in range(200):
+        for i in range(100):
             sim_id+=1
             out_file = '{0}/bold_lam{1}_sim{2}.csv'.format(out_dir, args.lambdaa, sim_id)
             if not os.path.exists(out_file):
@@ -210,7 +222,7 @@ def main(args,ver):
 
 #    writeout_spin_states(out_dir, args.lambdaa, sim_id, ising_system.output)	#raw Ising signal
     writeout_bold(out_file, ising_system.output, ising_system.times, size)	#convolved Ising signal with hemodynamic response function to imitate BOLD
-    if True:   #set to true to check out simulated synchrony distribution to make sure in equilibrium regime (symmetric distribution)
+    if False:   #set to true to check out simulated synchrony distribution to make sure in equilibrium regime (symmetric distribution)
             plt.rcParams.update({'font.size': 14})
             plt.hist(ising_system.magnetization_timeseries/size, range=(-1,1))
             plt.title('subject {0}, $\\lambda = {1}$'.format(sub_id, args.lambdaa))
