@@ -1,5 +1,6 @@
 *.pyc
 *extra*
-data/
+*old*
+ukb/
 __pycache__/
 .DS_Store
