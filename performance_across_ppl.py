@@ -23,19 +23,19 @@ plt.rcParams.update({'font.size': 14})
 
 
 
-def run(fmri_files, which):
+def run(fmri_files, atlas, dataset):
 	subs = []
 	outputs = []
 
 	for fmri in fmri_files:
-		sub, structure = get_structure(fmri, dataset, which, 'density')
-		_, structure_length = get_structure(fmri, dataset, which, 'length')	#needed for search_information
+		sub, structure = get_structure(fmri, dataset, atlas, 'density')
+		_, structure_length = get_structure(fmri, dataset, atlas, 'length')	#needed for search_information
 		raw_fxn = np.loadtxt(fmri, delimiter=',')
 
 		fc = np.corrcoef(raw_fxn.T)    #fxn is captured by correlation of time-series between two regions
 
-		structure, fc = delete_empty_index(structure, fc, which)
-		structure_length, _ = delete_empty_index(structure_length, fc, which)	#dont delete fc elements twice
+		structure, fc = delete_empty_index(structure, fc, atlas)
+		structure_length, _ = delete_empty_index(structure_length, fc, atlas)	#dont delete fc elements twice
 
 		indi = no_edges(structure)
 		structure = delete_indi(indi, structure)
@@ -44,6 +44,7 @@ def run(fmri_files, which):
 
 		fc_top_mode = deconstruct_cov(fc, 1)
 		upper_tri = np.triu_indices(structure.shape[0], k=1)	#dont include diagonal elements, also dont double count
+
 
 		outputs.append([correlation(structure, fc, upper_tri), 'all', 'adjacency'])
 		outputs.append([correlation(structure, fc_top_mode, upper_tri), 'top', 'adjacency'])
@@ -57,26 +58,30 @@ def run(fmri_files, which):
 		outputs.append([correlation(cmys, fc_top_mode, upper_tri), 'top', 'communicability'])
 
 		cts = commute_time(structure)
-
 		outputs.append([-correlation(cts, fc, upper_tri), 'all', 'commute time'])
 		outputs.append([-correlation(cts, fc_top_mode, upper_tri), 'top', 'commute time'])
 
+		cts_top = deconstruct_cov(cts, 1)
+		outputs.append([-correlation(cts_top, fc, upper_tri), 'all', 'top mode'])
+		outputs.append([-correlation(cts_top, fc_top_mode, upper_tri), 'top', 'top mode'])
+
 
 		subs.append(int(sub))
-
+	
 	return outputs
 
 def plotout(df, title):
-	plt.figure().set_figwidth(8.5)
+	plt.figure().set_figwidth(10)
 	ax= sns.violinplot(data=df, x='metric', y='corr', hue='FC modes', inner='quart', split=True)
 	sns.move_legend(ax, loc='upper left')
 
 
-	plt.xticks(np.arange(4), ['adjacency', '$-$search info','$-$communicability', 'commute time'])
-	plt.ylim([-0.1, 0.7])
+	plt.xticks(np.arange(5), ['connectivity', '$-$search info','communicability', '$-\\mathbf{commute \ time}$', '$-$top mode of\n$\\mathbf{commute \ time}$'])
+	plt.ylim([-0.16070026065475126, 0.717341464235392])	#have all plots have same y-axis scale
+#	print(plt.gca().get_ylim())
+	plt.xlabel('')
+	plt.ylabel('$\\rho($metric, FC$)$')
 
-	plt.xlabel('metrics calculated based on structure')
-	plt.ylabel('$\\rho($structure, FC$)$')
 	plt.title(title)
 	plt.grid()
 	plt.tight_layout()
@@ -85,15 +90,16 @@ def plotout(df, title):
 
 def compare_distributions(df):
 #print out Kolmogorov-Smirnoff between distribution of correlations
+	fc_mode = 'all'#have this a parameter of the function
 
 	for metric1 in ['commute time', 'adjacency', 'search info', 'communicability']:
 
 		pre_ct = df[df['metric']==metric1]
-		ct = pre_ct[pre_ct['FC modes']=='all']['corr']
+		ct = pre_ct[pre_ct['FC modes']==fc_mode]['corr']
 
 		for metric_name in ['adjacency', 'search info', 'communicability']:
-			pre = df[df['metric']==metric_name]#[df['FC modes']=='all']['corr']
-			metric = pre[pre['FC modes']=='all']['corr']
+			pre = df[df['metric']==metric_name]
+			metric = pre[pre['FC modes']==fc_mode]['corr']
 
 			kval, pval = kstest(ct, metric)
 			print(metric1, metric_name, kval, pval)
@@ -103,26 +109,28 @@ if __name__ == "__main__":
 	atlas = 'DesKi'	#Talairach, DesKi
 	dataset = 'hcp_ya_100'	#ukb, hcp_ya_100
 
-	fmri_files = glob.glob('data/{0}/{1}/fMRI/*'.format(dataset, atlas))
+	fmri_files = glob.glob('data/{0}/{1}/fMRI/*.csv'.format(dataset, atlas))	#this needs to be adjusted now with *merged.csv files present
+#	fmri_files = glob.glob('data/{0}/{1}/fMRI_deconv/*deconv.csv'.format(dataset, atlas))	#this needs to be adjusted now with *merged.csv files present
 
-	outputs = run(fmri_files, atlas)
+	outputs = run(fmri_files, atlas, dataset)
 	df = pd.DataFrame(outputs, columns = ['corr', 'FC modes', 'metric'])
 
 
 	if dataset=='ukb':
 		title = 'UK Biobank ($N=${0} subjects)'.format(len(fmri_files))
+#		title = 'UK Biobank ($N=${0} subjects), Talairach atlas'.format(len(fmri_files))
 	elif dataset=='hcp_ya_100':
 		if atlas=='Glasser':
-			title = 'HCP Young Adult, probabilistic tractography, Glasser atlas ($N=${0} subjects)'.format(len(ct))	#data from Rosen et al. 2021	
+			title = 'HCP Young Adult, probabilistic tractography, Glasser atlas ($N=${0} subjects)'.format(len(fmri_files))	#data from Rosen et al. 2021	
 		else:
+#			title='HCP Young Adult, probabilistic tractography ($N=${0} scans)'.format(len(fmri_files))
 			title='HCP Young Adult ($N=${0} scans)'.format(len(fmri_files))
 	plotout(df, title)
 
 #print mean and std of correlations across individuals
-#	pre_group = df[df['metric']=='commute time']
-#	print_stats(pre_group[pre_group['FC modes']=='all'])
-#	print_stats(pre_group[pre_group['FC modes']=='top'])
+	pre_group = df[df['metric']=='top mode']
+	print_stats(pre_group[pre_group['FC modes']=='top'])
 
 #print Kologomorov-Smirnov test summary for pairwise distribution comparision
-#	compare_distributions(df)
+	compare_distributions(df)
 
