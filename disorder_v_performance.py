@@ -6,28 +6,28 @@ health disorders.
 """
 
 import numpy as np
-import sys, glob
+import sys, glob, os
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.stats import kstest
+from scipy.stats import kstest, spearmanr
 import seaborn as sns
 
 sys.path.append('utlts/')
 from analysis_tools import get_structure, delete_indi, print_stats, no_edges, correlation, delete_empty_index
-from structure_metrics import laplacian, commute_time, deconstruct_cov, weighted_communicability, search_information
+from structure_metrics import commute_time, deconstruct_cov
 
 
 plt.rcParams.update({'font.size': 14})
 
 
 
-def run(fmri_files, atlas):
+def run(fmri_files, atlas, dataset):
 	subs = []
 	ct_fxn = []
 	ct_topfxn = []
 
 	for fmri in fmri_files:
-		sub, structure = get_structure(fmri, 'ukb', atlas, 'density')
+		sub, structure = get_structure(fmri, dataset, atlas, 'density')
 		raw_fxn = np.loadtxt(fmri, delimiter=',')
 		fc = np.corrcoef(raw_fxn.T)    #fxn is captured by correlation of time-series between two regions
 
@@ -50,23 +50,40 @@ def run(fmri_files, atlas):
 
 	return subs, ct_fxn, ct_topfxn 
 
+
 def make_dataframe(outputs, df, mental_status, FC_mode):
 	for corr in df:
 		outputs.append([corr, mental_status, FC_mode])
 	return outputs
 
+
+def plotout(df):
+	ax= sns.violinplot(data=df, x='disorder status', y='corr', hue='FC modes', inner='quart', split=True)
+	sns.move_legend(ax, loc='lower right')
+
+	plt.xticks(np.arange(3), ['mental disorder\n($N=${0})'.format(len(df_overlap)), 'brain disease\n($N=${0})'.format(len(df_overlap_neuro)), 'healthy\n($N=${0})'.format(len(df_healthy))])
+	plt.title('UK Biobank')
+	plt.ylabel('$\\rho(-$commute time, FC$)$')
+	plt.xlabel('')
+	plt.grid()
+	plt.tight_layout()
+
+	plt.show()
+
+
 def compare_distributions(df):
-	fc_mode = 'all'
-	pre_ct = df[df['disorder status']==fc_mode]
-	
-	ct = pre_ct[pre_ct['FC modes']==fc_mode]['corr']
+	fc_mode = 'top'
 
-	for group in ['brain disease', 'mental disorder']:
-		pre = df[df['disorder status']==group]
-		metric = pre[pre['FC modes']==fc_mode]['corr']
+	for group in ['healthy', 'brain disease', 'mental disorder']:
+		pre_ct = df[df['disorder status']==group]
+		ct = pre_ct[pre_ct['FC modes']==fc_mode]['corr']
 
-		kval, pval = kstest(ct, metric)
-		print(group, kval, pval)
+		for group2 in ['brain disease', 'mental disorder']:
+			pre = df[df['disorder status']==group2]
+			metric = pre[pre['FC modes']==fc_mode]['corr']
+
+			kval, pval = kstest(ct, metric)
+			print(group, group2, kval, pval)
 
 
 if __name__ == "__main__":
@@ -74,7 +91,7 @@ if __name__ == "__main__":
 
 	fmri_files = glob.glob('data/ukb/{0}/fMRI/*'.format(atlas))
 
-	subs, ct_fxn, ct_topfxn = run(fmri_files, atlas)
+	subs, ct_fxn, ct_topfxn = run(fmri_files, atlas, 'ukb')
 
 	df_data = pd.DataFrame({'id': subs, 'corr':ct_fxn, 'corr_top': ct_topfxn})
 
@@ -86,6 +103,8 @@ if __name__ == "__main__":
 	df_neuro = pd.read_csv('{0}.csv'.format(neuro_file))
 	df_overlap_neuro = df_data.merge(df_neuro,on='id')
 
+	df_healthy = df_data[~df_data['id'].isin(df_overlap['id'])]
+	df_healthy = df_healthy[~df_healthy['id'].isin(df_overlap_neuro['id'])]
 
 #make dataframe to utilize seaborn's violinplotting
 	outputs = []
@@ -95,22 +114,13 @@ if __name__ == "__main__":
 	outputs = make_dataframe(outputs, df_overlap_neuro['corr'], 'brain disease', 'all')
 	outputs = make_dataframe(outputs, df_overlap_neuro['corr_top'], 'brain disease', 'top')
 
-	outputs = make_dataframe(outputs, df_data['corr'], 'all', 'all')
-	outputs = make_dataframe(outputs, df_data['corr_top'], 'all', 'top')
+	outputs = make_dataframe(outputs, df_healthy['corr'], 'healthy', 'all')
+	outputs = make_dataframe(outputs, df_healthy['corr_top'], 'healthy', 'top')
 
 
 	df = pd.DataFrame(outputs, columns = ['corr', 'disorder status', 'FC modes'])
-
-	ax= sns.violinplot(data=df, x='disorder status', y='corr', hue='FC modes', inner='quart', split=True)
-	sns.move_legend(ax, loc='lower right')
-
-	plt.xticks(np.arange(3), ['mental disorder\n($N=${0})'.format(len(df_overlap)), 'brain disease\n($N=${0})'.format(len(df_overlap_neuro)), 'all\n($N=${0})'.format(len(df_data))])
-	plt.title('UK Biobank')
-	plt.ylabel('$\\rho(-$commute time, FC$)$')
-#	plt.ylim([-0.2, 0.7])
-	plt.xlabel('')
-	plt.grid()
-	plt.tight_layout()
-
+	
 	compare_distributions(df)
-	plt.show()
+	plotout(df)
+
+

@@ -23,7 +23,7 @@ from structure_metrics import commute_time, deconstruct_cov
 plt.rcParams.update({'font.size': 14})
 
 
-def run(fmri_files, atlas, dataset):
+def run(fmri_files, atlas, dataset, title):
 	subs = []
 	outputs = []
 
@@ -151,5 +151,5 @@ if __name__ == "__main__":
 
 	df_merged1 = df_merged[df_merged['FC modes']=='all']
 	df_merged2 = df_merged[df_merged['FC modes']=='top']
-	plotout(df_merged1, df_merged2)
+	plotout(df_merged1, df_merged2, title)
 
